@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quant Ledger — Chapter Performance Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1E2A44;
+    --ink-soft:#4A5670;
+    --paper:#EEF1EE;
+    --panel:#FFFFFF;
+    --border:#CBD1C8;
+    --amber:#C7862B;
+    --sage:#3F7A60;
+    --coral:#B24D3E;
+    --sage-bg:#E4EEE7;
+    --amber-bg:#F5E9D5;
+    --coral-bg:#F3E1DC;
+    --grid-line: rgba(30,42,68,0.06);
+    --shadow: 0 1px 2px rgba(30,42,68,0.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#EDEFE9;
+      --ink-soft:#AEB6C4;
+      --paper:#161A22;
+      --panel:#1F2530;
+      --border:#333B4A;
+      --amber:#E0A857;
+      --sage:#6FBE99;
+      --coral:#E07B67;
+      --sage-bg:#1F3129;
+      --amber-bg:#332A18;
+      --coral-bg:#3A2420;
+      --grid-line: rgba(237,239,233,0.07);
+      --shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#EDEFE9;
+    --ink-soft:#AEB6C4;
+    --paper:#161A22;
+    --panel:#1F2530;
+    --border:#333B4A;
+    --amber:#E0A857;
+    --sage:#6FBE99;
+    --coral:#E07B67;
+    --sage-bg:#1F3129;
+    --amber-bg:#332A18;
+    --coral-bg:#3A2420;
+    --grid-line: rgba(237,239,233,0.07);
+    --shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:1100px;
+    margin:0 auto;
+    padding:38px 24px 80px;
+  }
+  header.top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:20px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+  }
+  header.top .title-block h1{
+    font-family:'Spectral', serif;
+    font-weight:600;
+    font-size:2.1rem;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  header.top .title-block p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:0.95rem;
+  }
+  .reset-btn{
+    background:none;
+    border:1px solid var(--border);
+    color:var(--ink-soft);
+    padding:8px 14px;
+    border-radius:6px;
+    font-size:0.82rem;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .reset-btn:hover{ border-color:var(--coral); color:var(--coral); }
+
+  .summary{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:14px;
+    margin-bottom:28px;
+  }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:16px 18px;
+    box-shadow:var(--shadow);
+  }
+  .stat .num{
+    font-family:'Spectral', serif;
+    font-size:2rem;
+    font-weight:600;
+    line-height:1;
+  }
+  .stat .lbl{
+    margin-top:6px;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+  }
+  .stat.sage .num{ color:var(--sage); }
+  .stat.amber .num{ color:var(--amber); }
+  .stat.coral .num{ color:var(--coral); }
+
+  .chart-panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:20px 20px 8px;
+    margin-bottom:32px;
+    box-shadow:var(--shadow);
+  }
+  .chart-panel h2{
+    font-family:'Spectral', serif;
+    font-size:1.15rem;
+    font-weight:600;
+    margin:0 0 2px;
+  }
+  .chart-panel .sub{
+    color:var(--ink-soft);
+    font-size:0.85rem;
+    margin:0 0 14px;
+  }
+  .chart-legend{
+    display:flex;
+    gap:18px;
+    font-size:0.8rem;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+    flex-wrap:wrap;
+  }
+  .chart-legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+
+  .list-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .list-head h2{
+    font-family:'Spectral', serif;
+    font-size:1.15rem;
+    font-weight:600;
+    margin:0;
+  }
+  .filter-row{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .filter-row button{
+    background:none;
+    border:1px solid var(--border);
+    color:var(--ink-soft);
+    padding:5px 12px;
+    border-radius:20px;
+    font-size:0.78rem;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .filter-row button.active{
+    background:var(--ink);
+    color:var(--paper);
+    border-color:var(--ink);
+  }
+
+  .topic{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    margin-bottom:10px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .topic-row{
+    display:grid;
+    grid-template-columns:34px 1fr 90px 130px 100px 24px;
+    align-items:center;
+    gap:14px;
+    padding:13px 16px;
+    cursor:pointer;
+  }
+  .topic-num{
+    font-family:'Spectral', serif;
+    font-weight:600;
+    color:var(--ink-soft);
+    font-size:1.05rem;
+  }
+  .topic-name{ font-weight:500; }
+  .topic-pages{ font-size:0.8rem; color:var(--ink-soft); }
+  .topic-pagerange{ font-size:0.82rem; color:var(--ink-soft); text-align:right; }
+  .badge{
+    font-size:0.74rem;
+    padding:4px 9px;
+    border-radius:20px;
+    text-align:center;
+    font-weight:500;
+  }
+  .badge.not-started{ background:var(--grid-line); color:var(--ink-soft); }
+  .badge.progress{ background:var(--amber-bg); color:var(--amber); }
+  .badge.strong{ background:var(--sage-bg); color:var(--sage); }
+  .badge.weak{ background:var(--coral-bg); color:var(--coral); }
+
+  .accuracy-mini{
+    font-size:0.85rem;
+    text-align:right;
+    color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;
+  }
+  .chevron{
+    transition:transform 0.15s ease;
+    color:var(--ink-soft);
+    justify-self:end;
+  }
+  .topic.open .chevron{ transform:rotate(180deg); }
+
+  .topic-body{
+    display:none;
+    padding:6px 16px 18px;
+    border-top:1px solid var(--grid-line);
+  }
+  .topic.open .topic-body{ display:block; }
+
+  .body-hint{
+    font-size:0.8rem;
+    color:var(--ink-soft);
+    margin:12px 0 10px;
+  }
+  .body-hint b{ color:var(--ink); }
+
+  .page-table{
+    display:grid;
+    grid-template-columns:64px 1fr 1fr 70px;
+    gap:6px 10px;
+    align-items:center;
+  }
+  .page-table .col-head{
+    font-size:0.7rem;
+    text-transform:none;
+    color:var(--ink-soft);
+    padding-bottom:4px;
+    border-bottom:1px solid var(--grid-line);
+  }
+  .page-table .page-label{
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;
+  }
+  .page-table input{
+    width:100%;
+    background:var(--paper);
+    border:1px solid var(--border);
+    border-radius:5px;
+    padding:6px 8px;
+    color:var(--ink);
+    font-family:inherit;
+    font-size:0.85rem;
+  }
+  .page-table input:focus{
+    outline:2px solid var(--amber);
+    outline-offset:1px;
+  }
+  .page-table .pg-acc{
+    font-size:0.8rem;
+    text-align:right;
+    color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;
+  }
+  .page-row.filled .pg-acc.strong{ color:var(--sage); font-weight:600; }
+  .page-row.filled .pg-acc.progress{ color:var(--amber); font-weight:600; }
+  .page-row.filled .pg-acc.weak{ color:var(--coral); font-weight:600; }
+
+  .notes-row{ margin-top:16px; }
+  .notes-row label{ font-size:0.74rem;color:var(--ink-soft); }
+  .notes-row textarea{
+    width:100%;
+    min-height:52px;
+    background:var(--paper);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:8px 9px;
+    color:var(--ink);
+    font-family:inherit;
+    font-size:0.86rem;
+    resize:vertical;
+    margin-top:5px;
+  }
+  .checkin-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:14px;
+    font-size:0.8rem;
+    color:var(--ink-soft);
+  }
+  .checkin-btn{
+    background:var(--sage-bg);
+    color:var(--sage);
+    border:none;
+    padding:7px 13px;
+    border-radius:6px;
+    font-size:0.8rem;
+    cursor:pointer;
+    font-family:inherit;
+    font-weight:500;
+  }
+
+  footer{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:0.78rem;
+    margin-top:36px;
+  }
+
+  @media (max-width:640px){
+    .summary{ grid-template-columns:repeat(2,1fr); }
+    .topic-row{
+      grid-template-columns:24px 1fr 20px;
+      row-gap:6px;
+    }
+    .topic-pages, .accuracy-mini, .badge{ display:none; }
+    .page-table{ grid-template-columns:44px 1fr 1fr 56px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="title-block">
+      <h1>Quant Ledger</h1>
+      <p>17 chapters · 298 pages · marks &amp; correct-answer ratio logged page by page</p>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="reset-btn" id="exportBtn">Download backup</button>
+      <button class="reset-btn" id="importBtn">Restore backup</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+      <button class="reset-btn" id="resetBtn">Reset all data</button>
+    </div>
+  </header>
+
+  <section class="summary">
+    <div class="stat">
+      <div class="num" id="statPagesDone">0<span style="font-size:1rem;color:var(--ink-soft);">/298</span></div>
+      <div class="lbl">Pages logged</div>
+    </div>
+    <div class="stat amber">
+      <div class="num" id="statAccuracy">—</div>
+      <div class="lbl">Overall accuracy</div>
+    </div>
+    <div class="stat sage">
+      <div class="num" id="statStrong">0</div>
+      <div class="lbl">Strong chapters (≥75%)</div>
+    </div>
+    <div class="stat coral">
+      <div class="num" id="statWeak">0</div>
+      <div class="lbl">Weak chapters (&lt;50%)</div>
+    </div>
+  </section>
+
+  <section class="chart-panel">
+    <h2>Accuracy by chapter</h2>
+    <p class="sub">Aggregated from every page you've logged marks for in that chapter.</p>
+    <div class="chart-legend">
+      <span><span class="dot" style="background:var(--sage);"></span>Strong (≥75%)</span>
+      <span><span class="dot" style="background:var(--amber);"></span>Building (50–74%)</span>
+      <span><span class="dot" style="background:var(--coral);"></span>Weak (&lt;50%)</span>
+    </div>
+    <canvas id="chart" height="230"></canvas>
+  </section>
+
+  <section>
+    <div class="list-head">
+      <h2>Chapters</h2>
+      <div class="filter-row" id="filterRow">
+        <button class="active" data-f="all">All</button>
+        <button data-f="not-started">Not started</button>
+        <button data-f="progress">In progress</button>
+        <button data-f="strong">Strong</button>
+        <button data-f="weak">Weak</button>
+      </div>
+    </div>
+    <div id="topicList"></div>
+  </section>
+
+  <footer>Open a chapter, then type marks and correct answers page by page — press Enter to jump straight to the next field. Everything saves in this browser only.</footer>
+</div>
+
+<script>
+const TOPICS = [
+  {n:1, name:"Percentages", pages:"1-24"},
+  {n:2, name:"Profit & Loss", pages:"25-50"},
+  {n:3, name:"Discounts", pages:"51-68"},
+  {n:4, name:"Simple Interest", pages:"69-85"},
+  {n:5, name:"Compound Interest", pages:"86-97"},
+  {n:6, name:"Instalments", pages:"98-101"},
+  {n:7, name:"Ratio & Proportion", pages:"102-124"},
+  {n:8, name:"Alligation & Mixtures", pages:"125-135"},
+  {n:9, name:"Partnership", pages:"136-155"},
+  {n:10, name:"Ages", pages:"156-161"},
+  {n:11, name:"Averages", pages:"162-188"},
+  {n:12, name:"Time & Work", pages:"189-225"},
+  {n:13, name:"Pipes & Cisterns", pages:"226-241"},
+  {n:14, name:"Time & Distance", pages:"242-274"},
+  {n:15, name:"Trains", pages:"275-281"},
+  {n:16, name:"Boats & Streams", pages:"282-293"},
+  {n:17, name:"Races", pages:"294-298"}
+];
+
+const STORAGE_KEY = "quant-ledger-v2";
+
+function parseRange(rangeStr){
+  const [a,b] = rangeStr.split("-").map(Number);
+  return [a,b];
+}
+function pageCount(rangeStr){
+  const [a,b] = parseRange(rangeStr);
+  return (b - a + 1);
+}
+function pageList(rangeStr){
+  const [a,b] = parseRange(rangeStr);
+  const arr = [];
+  for(let p=a; p<=b; p++) arr.push(p);
+  return arr;
+}
+
+function emptyTopicEntry(){
+  return { pages:{}, notes:"", lastCheckin:null };
+}
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){ console.error("load failed", e); }
+  const init = {};
+  TOPICS.forEach(t => { init[t.n] = emptyTopicEntry(); });
+  return init;
+}
+function saveData(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+  catch(e){ console.error("save failed", e); }
+}
+
+let data = loadData();
+TOPICS.forEach(t => { if(!data[t.n]) data[t.n] = emptyTopicEntry(); if(!data[t.n].pages) data[t.n].pages = {}; });
+
+let openTopic = null;
+let activeFilter = "all";
+let chart = null;
+
+function pageAccuracy(pg){
+  const m = parseFloat(pg && pg.marks);
+  const c = parseFloat(pg && pg.correct);
+  if(!m || m<=0 || isNaN(c)) return null;
+  return Math.round((c/m)*1000)/10;
+}
+
+function chapterAgg(topic){
+  const entry = data[topic.n];
+  let totalMarks = 0, totalCorrect = 0, loggedPages = 0;
+  pageList(topic.pages).forEach(p => {
+    const pg = entry.pages[p];
+    const acc = pageAccuracy(pg);
+    if(acc !== null){
+      totalMarks += parseFloat(pg.marks);
+      totalCorrect += parseFloat(pg.correct);
+      loggedPages++;
+    }
+  });
+  const accuracy = totalMarks>0 ? Math.round((totalCorrect/totalMarks)*1000)/10 : null;
+  return { accuracy, loggedPages, totalPages: pageCount(topic.pages) };
+}
+
+function classify(agg){
+  if(agg.loggedPages === 0) return "not-started";
+  if(agg.accuracy === null) return "not-started";
+  if(agg.accuracy >= 75) return "strong";
+  if(agg.accuracy >= 50) return "progress";
+  return "weak";
+}
+function badgeLabel(cls){
+  return { "not-started":"Not started", "progress":"In progress", "strong":"Strong", "weak":"Weak" }[cls];
+}
+function tierOf(acc){
+  if(acc === null) return "";
+  if(acc >= 75) return "strong";
+  if(acc >= 50) return "progress";
+  return "weak";
+}
+
+function render(){
+  let pagesLogged = 0, totalMarks = 0, totalCorrect = 0, strongCount = 0, weakCount = 0;
+  TOPICS.forEach(t => {
+    const agg = chapterAgg(t);
+    pagesLogged += agg.loggedPages;
+    const cls = classify(agg);
+    if(cls === "strong") strongCount++;
+    if(cls === "weak") weakCount++;
+    pageList(t.pages).forEach(p => {
+      const pg = data[t.n].pages[p];
+      const acc = pageAccuracy(pg);
+      if(acc !== null){ totalMarks += parseFloat(pg.marks); totalCorrect += parseFloat(pg.correct); }
+    });
+  });
+  document.getElementById("statPagesDone").innerHTML = pagesLogged + '<span style="font-size:1rem;color:var(--ink-soft);">/298</span>';
+  document.getElementById("statAccuracy").textContent = totalMarks>0 ? Math.round((totalCorrect/totalMarks)*1000)/10 + "%" : "—";
+  document.getElementById("statStrong").textContent = strongCount;
+  document.getElementById("statWeak").textContent = weakCount;
+
+  const listEl = document.getElementById("topicList");
+  const prevScroll = window.scrollY;
+  listEl.innerHTML = "";
+
+  TOPICS.forEach(t => {
+    const agg = chapterAgg(t);
+    const cls = classify(agg);
+    if(activeFilter !== "all" && activeFilter !== cls) return;
+
+    const topicEl = document.createElement("div");
+    topicEl.className = "topic" + (openTopic === t.n ? " open" : "");
+
+    let rowsHtml = "";
+    if(openTopic === t.n){
+      const entry = data[t.n];
+      const rows = pageList(t.pages).map(p => {
+        const pg = entry.pages[p] || {marks:"", correct:""};
+        const acc = pageAccuracy(pg);
+        const tier = tierOf(acc);
+        return `
+          <div class="page-row${acc!==null?" filled":""}" style="display:contents;">
+            <div class="page-label">Page ${p}</div>
+            <input type="number" min="0" inputmode="numeric" placeholder="Marks" data-kind="marks" data-page="${p}" data-topic="${t.n}" value="${pg.marks}">
+            <input type="number" min="0" inputmode="numeric" placeholder="Correct" data-kind="correct" data-page="${p}" data-topic="${t.n}" value="${pg.correct}">
+            <div class="pg-acc ${tier}">${acc!==null ? acc+"%" : "—"}</div>
+          </div>
+        `;
+      }).join("");
+      rowsHtml = `
+        <p class="body-hint">Type the marks (questions attempted) and correct answers for each page. Press <b>Enter</b> to move straight to the next field — Page ${pageList(t.pages)[0]} first.</p>
+        <div class="page-table">
+          <div class="col-head">Page</div>
+          <div class="col-head">Marks</div>
+          <div class="col-head">Correct</div>
+          <div class="col-head" style="text-align:right;">Accuracy</div>
+          ${rows}
+        </div>
+        <div class="notes-row">
+          <label>Notes — mistakes, formulas to revisit</label>
+          <textarea data-field="notes" data-topic="${t.n}" placeholder="e.g. mixing up ratio inverse in mixtures problems">${entry.notes}</textarea>
+        </div>
+        <div class="checkin-row">
+          <button class="checkin-btn" data-checkin="${t.n}">Mark reviewed today</button>
+          <span>${entry.lastCheckin ? "Last check-in: " + entry.lastCheckin : "No check-in yet"}</span>
+        </div>
+      `;
+    }
+
+    topicEl.innerHTML = `
+      <div class="topic-row" data-toggle="${t.n}">
+        <div class="topic-num">${String(t.n).padStart(2,"0")}</div>
+        <div>
+          <div class="topic-name">${t.name}</div>
+          <div class="topic-pages">${agg.loggedPages}/${agg.totalPages} pages logged</div>
+        </div>
+        <div class="topic-pagerange">pg. ${t.pages.replace("-","–")}</div>
+        <div class="badge ${cls}">${badgeLabel(cls)}</div>
+        <div class="accuracy-mini">${agg.accuracy !== null ? agg.accuracy + "%" : "—"}</div>
+        <div class="chevron">▾</div>
+      </div>
+      <div class="topic-body">${rowsHtml}</div>
+    `;
+    listEl.appendChild(topicEl);
+  });
+
+  listEl.querySelectorAll("[data-toggle]").forEach(row => {
+    row.addEventListener("click", () => {
+      const n = Number(row.dataset.toggle);
+      openTopic = openTopic === n ? null : n;
+      render();
+      if(openTopic === n){
+        const firstInput = listEl.querySelector(`input[data-topic="${n}"][data-kind="marks"]`);
+        if(firstInput) setTimeout(() => firstInput.focus(), 30);
+      }
+    });
+  });
+
+  listEl.querySelectorAll("input[data-kind]").forEach(el => {
+    el.addEventListener("click", e => e.stopPropagation());
+    el.addEventListener("input", (e) => {
+      const topicN = el.dataset.topic, page = el.dataset.page, kind = el.dataset.kind;
+      if(!data[topicN].pages[page]) data[topicN].pages[page] = {marks:"", correct:""};
+      data[topicN].pages[page][kind] = el.value;
+      saveData();
+      updateRowLive(el, topicN, page);
+      updateHeaderLive();
+    });
+    el.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){
+        e.preventDefault();
+        const topicN = el.dataset.topic, page = Number(el.dataset.page), kind = el.dataset.kind;
+        const topic = TOPICS.find(t => t.n === Number(topicN));
+        let next;
+        if(kind === "marks"){
+          next = listEl.querySelector(`input[data-topic="${topicN}"][data-page="${page}"][data-kind="correct"]`);
+        } else {
+          const pages = pageList(topic.pages);
+          const idx = pages.indexOf(page);
+          const nextPage = pages[idx+1];
+          if(nextPage){
+            next = listEl.querySelector(`input[data-topic="${topicN}"][data-page="${nextPage}"][data-kind="marks"]`);
+          }
+        }
+        if(next){ next.focus(); next.select(); }
+      }
+    });
+  });
+
+  listEl.querySelectorAll("textarea[data-field]").forEach(el => {
+    el.addEventListener("click", e => e.stopPropagation());
+    el.addEventListener("input", (e) => {
+      data[el.dataset.topic].notes = el.value;
+      saveData();
+    });
+  });
+
+  listEl.querySelectorAll("[data-checkin]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const n = btn.dataset.checkin;
+      data[n].lastCheckin = new Date().toLocaleDateString(undefined, {month:"short", day:"numeric", year:"numeric"});
+      saveData();
+      render();
+    });
+  });
+
+  renderChart();
+  window.scrollTo(0, prevScroll);
+}
+
+function updateRowLive(inputEl, topicN, page){
+  const pg = data[topicN].pages[page];
+  const acc = pageAccuracy(pg);
+  const tier = tierOf(acc);
+  const rowWrap = inputEl.closest(".page-row");
+  if(rowWrap){
+    rowWrap.classList.toggle("filled", acc !== null);
+    const accEl = rowWrap.querySelector(".pg-acc");
+    accEl.textContent = acc !== null ? acc + "%" : "—";
+    accEl.className = "pg-acc " + tier;
+  }
+  // update header row for this chapter
+  const topic = TOPICS.find(t => t.n === Number(topicN));
+  const agg = chapterAgg(topic);
+  const cls = classify(agg);
+  const topicRow = document.querySelector(`.topic-row[data-toggle="${topicN}"]`);
+  if(topicRow){
+    topicRow.querySelector(".topic-pages").textContent = `${agg.loggedPages}/${agg.totalPages} pages logged`;
+    const badge = topicRow.querySelector(".badge");
+    badge.className = "badge " + cls;
+    badge.textContent = badgeLabel(cls);
+    topicRow.querySelector(".accuracy-mini").textContent = agg.accuracy !== null ? agg.accuracy + "%" : "—";
+  }
+}
+
+function updateHeaderLive(){
+  let pagesLogged = 0, totalMarks = 0, totalCorrect = 0, strongCount = 0, weakCount = 0;
+  TOPICS.forEach(t => {
+    const agg = chapterAgg(t);
+    pagesLogged += agg.loggedPages;
+    const cls = classify(agg);
+    if(cls === "strong") strongCount++;
+    if(cls === "weak") weakCount++;
+    pageList(t.pages).forEach(p => {
+      const pg = data[t.n].pages[p];
+      const acc = pageAccuracy(pg);
+      if(acc !== null){ totalMarks += parseFloat(pg.marks); totalCorrect += parseFloat(pg.correct); }
+    });
+  });
+  document.getElementById("statPagesDone").innerHTML = pagesLogged + '<span style="font-size:1rem;color:var(--ink-soft);">/298</span>';
+  document.getElementById("statAccuracy").textContent = totalMarks>0 ? Math.round((totalCorrect/totalMarks)*1000)/10 + "%" : "—";
+  document.getElementById("statStrong").textContent = strongCount;
+  document.getElementById("statWeak").textContent = weakCount;
+  renderChart();
+}
+
+function renderChart(){
+  const ctx = document.getElementById("chart");
+  const labels = TOPICS.map(t => t.name);
+  const aggs = TOPICS.map(t => chapterAgg(t));
+  const values = aggs.map(a => a.accuracy);
+  const colors = aggs.map(a => {
+    const cls = classify(a);
+    if(cls === "strong") return getVar("--sage");
+    if(cls === "weak") return getVar("--coral");
+    if(cls === "progress") return getVar("--amber");
+    return getVar("--grid-line");
+  });
+
+  if(chart){ chart.destroy(); }
+  chart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        data: values.map(v => v === null ? 0 : v),
+        backgroundColor: colors,
+        borderRadius: 4,
+        maxBarThickness: 26
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = values[ctx.dataIndex];
+              const a = aggs[ctx.dataIndex];
+              return v === null ? "No pages logged" : v + "% accuracy (" + a.loggedPages + "/" + a.totalPages + " pages)";
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          min:0, max:100,
+          grid: { color: getVar("--grid-line") },
+          ticks: { color: getVar("--ink-soft"), callback: v => v + "%" }
+        },
+        x: {
+          grid: { display:false },
+          ticks: { color: getVar("--ink-soft"), font:{size:10}, maxRotation:60, minRotation:60 }
+        }
+      }
+    }
+  });
+}
+
+function getVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+document.getElementById("filterRow").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if(!btn) return;
+  activeFilter = btn.dataset.f;
+  document.querySelectorAll("#filterRow button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  render();
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if(confirm("Clear all logged progress? This can't be undone.")){
+    data = {};
+    TOPICS.forEach(t => { data[t.n] = emptyTopicEntry(); });
+    saveData();
+    render();
+  }
+});
+
+let downloadsCap = null;
+(async () => {
+  try{
+    if(window.claude && typeof window.claude.use === "function"){
+      downloadsCap = await window.claude.use("downloads");
+    }
+  }catch(e){ downloadsCap = null; }
+})();
+
+function timestampForFile(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+async function exportData(){
+  const payload = { version: 2, exportedAt: new Date().toISOString(), data };
+  const json = JSON.stringify(payload, null, 2);
+  const filename = `quant-ledger-backup-${timestampForFile()}.json`;
+
+  if(downloadsCap){
+    try{
+      await downloadsCap.save({ filename, data: json });
+      return;
+    }catch(e){
+      if(e && e.code === "declined") return;
+      console.error("downloads capability save failed, falling back", e);
+    }
+  }
+  try{
+    const blob = new Blob([json], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }catch(e){
+    console.error("fallback download failed", e);
+    alert("Couldn't start the download in this view. Try opening the page in a full browser tab.");
+  }
+}
+
+document.getElementById("exportBtn").addEventListener("click", exportData);
+
+document.getElementById("importBtn").addEventListener("click", () => {
+  document.getElementById("importFile").click();
+});
+
+document.getElementById("importFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const parsed = JSON.parse(reader.result);
+      const incoming = parsed && parsed.data ? parsed.data : parsed;
+      if(!incoming || typeof incoming !== "object") throw new Error("bad shape");
+      if(!confirm("Restore this backup? It will replace everything currently logged here.")) return;
+      data = {};
+      TOPICS.forEach(t => {
+        data[t.n] = incoming[t.n] ? { pages: incoming[t.n].pages || {}, notes: incoming[t.n].notes || "", lastCheckin: incoming[t.n].lastCheckin || null } : emptyTopicEntry();
+      });
+      saveData();
+      render();
+    }catch(err){
+      alert("That file doesn't look like a valid backup from this tracker.");
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+render();
+</script>
+</body>
+</html>
